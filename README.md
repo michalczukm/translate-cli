@@ -16,6 +16,13 @@ Translations of dzień dobry, co słychać?
     Good morning! How are you?
 ```
 
+## Lazy shell functions for the two most common (for me) pairs
+
+```zsh
+tpl() { translate en:pl "$@" }
+ten() { translate pl:en "$@" }
+```
+
 ## Install
 
 ```sh
@@ -65,13 +72,6 @@ translate usage                      # characters used this month
 ```
 
 Colour turns itself off when the output is piped; `--plain` also drops the block.
-
-### Lazy shell functions for the two most common (for me) pairs:
-
-```zsh
-tpl() { translate en:pl "$@" }
-ten() { translate pl:en "$@" }
-```
 
 ## Single words
 
