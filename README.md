@@ -19,10 +19,11 @@ Translations of dzień dobry, co słychać?
 ## Install
 
 ```sh
-cargo install --path .
+just link       # build + symlink into ~/.local/bin, rebuilds go live at once
+just install    # or copy into ~/.cargo/bin via cargo install
 ```
 
-Lands in `~/.cargo/bin/translate`.
+`just` on its own lists every recipe. Without `just`: `cargo install --path .`.
 
 ## API key
 
@@ -171,8 +172,6 @@ translation — so no async runtime is needed either.
 ## Development
 
 ```sh
-cargo test            # never touches the live API
-./scripts/smoke.sh    # does, using the key from .env
+just check      # clippy -D warnings, rustfmt, cargo test — no live API
+just smoke      # hits the real API with the key from .env
 ```
-
-Design notes live in `docs/superpowers/`.
