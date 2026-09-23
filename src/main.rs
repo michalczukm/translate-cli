@@ -1,4 +1,4 @@
-use std::io::{IsTerminal, Read};
+use std::io::{IsTerminal, Read, Write};
 
 use translate_cli::cli::{self, Args};
 use translate_cli::{config, prompt};
@@ -64,8 +64,11 @@ fn first_run_key() -> Option<String> {
 fn finish(result: Result<String, (i32, String)>) -> ! {
     match result {
         Ok(out) => {
-            print!("{out}");
-            std::process::exit(0)
+            // A closed pipe (`| head`) is a normal end, not a panic out of print!.
+            match write!(std::io::stdout(), "{out}") {
+                Err(e) if e.kind() != std::io::ErrorKind::BrokenPipe => fail(1, &e.to_string()),
+                _ => std::process::exit(0),
+            }
         }
         Err((code, msg)) => fail(code, &msg),
     }
