@@ -55,7 +55,7 @@ The key is looked up in this order:
 
 1. `DEEPL_API_KEY` environment variable
 2. `~/.config/translate-cli/.env`
-3. `./.env`
+3. `./.env` — see `.env.template`
 
 Free keys (ending in `:fx`) hit `api-free.deepl.com`, the rest `api.deepl.com`.
 
@@ -126,3 +126,5 @@ and the fix shown as `Did you mean: ...`; the translation then comes from the co
 just check      # clippy -D warnings, rustfmt, cargo test — no live API
 just smoke      # hits the real API with the key from .env
 ```
+
+CI runs the same three commands on every push.
