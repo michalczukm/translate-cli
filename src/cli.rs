@@ -9,7 +9,7 @@ Usage:
     translate usage                           characters used this month
     translate auth set-key [KEY]              store an API key
     translate auth path                       where the key lives
-    translate shell-setup                     add tpl (en->pl) and ten (pl->en) to your shell rc
+    translate setup                           shell shortcuts (tpl/ten or tde/ten) and API key
 
 TEXT is read from stdin when omitted.
 
@@ -69,7 +69,11 @@ pub fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Args, String
     }))
 }
 
-pub const KEY_HELP: &str = "Get a free API key at https://www.deepl.com/pro-api";
+pub const KEY_HELP: &str = "\
+translate uses DeepL to translate, which needs an API key.
+The free tier (500,000 characters/month) is plenty for home use.
+Get one: https://www.deepl.com/pro-api
+Already have an account? Your keys: https://www.deepl.com/your-account/keys";
 
 pub fn auth_command(args: &[String]) -> Result<String, (i32, String)> {
     match args.first().map(String::as_str) {
@@ -100,51 +104,106 @@ pub fn auth_command(args: &[String]) -> Result<String, (i32, String)> {
     }
 }
 
-const SHELL_FUNCTIONS: &str = "\n# translate-cli shortcuts\n\
-tpl() { translate en:pl \"$@\"; }\n\
-ten() { translate pl:en \"$@\"; }\n";
+const SHORTCUTS_MARKER: &str = "# translate-cli shortcuts";
 
-pub fn shell_setup_command() -> Result<String, (i32, String)> {
-    let shell = std::env::var("SHELL").unwrap_or_default();
-    let rc = match shell.rsplit('/').next() {
-        Some("zsh") => ".zshrc",
-        Some("bash") => ".bashrc",
-        _ => {
-            return Err((
-                1,
-                format!("unsupported shell `{shell}`, add these yourself:\n{SHELL_FUNCTIONS}"),
-            ));
-        }
-    };
-    let home = std::env::var_os("HOME").ok_or((1, "HOME is not set".to_string()))?;
-    let path = std::path::PathBuf::from(home).join(rc);
-    if append_shell_functions(&path).map_err(|e| (1, e.to_string()))? {
-        Ok(format!(
-            "added tpl and ten to {}, run: source {}\n",
-            path.display(),
-            path.display()
-        ))
-    } else {
-        Ok(format!("tpl and ten already in {}\n", path.display()))
+fn shell_functions(lang: &str) -> String {
+    format!(
+        "\n{SHORTCUTS_MARKER}\n\
+         t{lang}() {{ translate en:{lang} \"$@\"; }}\n\
+         ten() {{ translate {lang}:en \"$@\"; }}\n"
+    )
+}
+
+fn parse_language(input: &str) -> Option<&'static str> {
+    match input.trim().to_lowercase().as_str() {
+        "pl" => Some("pl"),
+        "de" => Some("de"),
+        _ => None,
     }
 }
 
-fn append_shell_functions(path: &std::path::Path) -> std::io::Result<bool> {
-    let current = match std::fs::read_to_string(path) {
-        Ok(s) => s,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(e) => return Err(e),
-    };
-    if current.contains("# translate-cli shortcuts") {
-        return Ok(false);
+fn rc_file(shell: &str) -> Option<&'static str> {
+    match shell.rsplit('/').next() {
+        Some("zsh") => Some(".zshrc"),
+        Some("bash") => Some(".bashrc"),
+        _ => None,
     }
+}
+
+/// Talks on stderr: on a first run stdout carries the translation that follows.
+pub fn setup_command() -> Result<String, (i32, String)> {
+    setup_shortcuts()?;
+    setup_key()?;
+    Ok(String::new())
+}
+
+fn setup_shortcuts() -> Result<(), (i32, String)> {
+    let shell = std::env::var("SHELL").unwrap_or_default();
+    let Some(rc) = rc_file(&shell) else {
+        let lang = ask_language()?;
+        eprintln!(
+            "unsupported shell `{shell}`, add these yourself:\n{}",
+            shell_functions(lang)
+        );
+        return Ok(());
+    };
+    let home = std::env::var_os("HOME").ok_or((1, "HOME is not set".to_string()))?;
+    let path = std::path::PathBuf::from(home).join(rc);
+    if has_shortcuts(&path).map_err(|e| (1, e.to_string()))? {
+        eprintln!("shortcuts already in {}", path.display());
+        return Ok(());
+    }
+    let lang = ask_language()?;
+    append_shortcuts(&path, lang).map_err(|e| (1, e.to_string()))?;
+    eprintln!(
+        "added t{lang} and ten to {p}, run: source {p}",
+        p = path.display()
+    );
+    Ok(())
+}
+
+fn ask_language() -> Result<&'static str, (i32, String)> {
+    loop {
+        let typed = prompt::read_line("Which language do you translate with English? [pl/de]: ")
+            .map_err(|m| (2, m))?;
+        match parse_language(&typed) {
+            Some(lang) => return Ok(lang),
+            None => eprintln!("pick pl or de"),
+        }
+    }
+}
+
+fn setup_key() -> Result<(), (i32, String)> {
+    if config::load().is_ok() {
+        eprintln!("DeepL API key already set");
+        return Ok(());
+    }
+    eprintln!("{KEY_HELP}");
+    let key = prompt::read_secret("DeepL API key: ").map_err(|m| (2, m))?;
+    if key.is_empty() {
+        eprintln!("no key entered, run `translate auth set-key` later");
+        return Ok(());
+    }
+    let path = config::save(&key).map_err(|m| (1, m))?;
+    eprintln!("key saved to {} (0600)", path.display());
+    Ok(())
+}
+
+fn has_shortcuts(path: &std::path::Path) -> std::io::Result<bool> {
+    match std::fs::read_to_string(path) {
+        Ok(s) => Ok(s.contains(SHORTCUTS_MARKER)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(e) => Err(e),
+    }
+}
+
+fn append_shortcuts(path: &std::path::Path, lang: &str) -> std::io::Result<()> {
     use std::io::Write;
     std::fs::OpenOptions::new()
         .create(true)
         .append(true)
         .open(path)?
-        .write_all(SHELL_FUNCTIONS.as_bytes())?;
-    Ok(true)
+        .write_all(shell_functions(lang).as_bytes())
 }
 
 pub fn parse_pair(pair: &str) -> Result<(Option<String>, String), String> {
@@ -281,14 +340,33 @@ mod tests {
     }
 
     #[test]
-    fn shell_functions_are_appended_once() {
+    fn shortcuts_are_detected_after_appending() {
         let path = std::env::temp_dir().join(format!("translate-rc-{}", std::process::id()));
         std::fs::write(&path, "export FOO=1\n").unwrap();
-        assert!(append_shell_functions(&path).unwrap());
-        assert!(!append_shell_functions(&path).unwrap());
+        assert!(!has_shortcuts(&path).unwrap());
+        append_shortcuts(&path, "de").unwrap();
+        assert!(has_shortcuts(&path).unwrap());
         let rc = std::fs::read_to_string(&path).unwrap();
         std::fs::remove_file(&path).unwrap();
-        assert_eq!(rc, format!("export FOO=1\n{SHELL_FUNCTIONS}"));
+        assert_eq!(rc, format!("export FOO=1\n{}", shell_functions("de")));
+    }
+
+    #[test]
+    fn shortcuts_pair_the_language_with_english() {
+        let pl = shell_functions("pl");
+        assert!(pl.contains("tpl() { translate en:pl \"$@\"; }"));
+        assert!(pl.contains("ten() { translate pl:en \"$@\"; }"));
+        let de = shell_functions("de");
+        assert!(de.contains("tde() { translate en:de \"$@\"; }"));
+        assert!(de.contains("ten() { translate de:en \"$@\"; }"));
+    }
+
+    #[test]
+    fn only_polish_and_german_are_offered() {
+        assert_eq!(parse_language(" DE\n"), Some("de"));
+        assert_eq!(parse_language("pl"), Some("pl"));
+        assert_eq!(parse_language("fr"), None);
+        assert_eq!(parse_language(""), None);
     }
 
     #[test]

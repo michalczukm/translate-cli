@@ -2,7 +2,7 @@ const REPHRASE: [&str; 8] = ["DE", "EN-GB", "EN-US", "ES", "FR", "IT", "PT-BR", 
 const FORMALITY: [&str; 10] = [
     "DE", "ES", "FR", "IT", "JA", "NL", "PL", "PT-BR", "PT-PT", "RU",
 ];
-const NAMES: [(&str, &str); 2] = [("EN", "English"), ("PL", "Polski")];
+const NAMES: [(&str, &str); 3] = [("DE", "Deutsch"), ("EN", "English"), ("PL", "Polski")];
 
 /// Bare `EN` and `PT` are rejected by DeepL as targets; they need a region.
 pub fn normalize_target(code: &str) -> String {
@@ -59,6 +59,7 @@ mod tests {
     #[test]
     fn display_names_are_endonyms_with_code_fallback() {
         assert_eq!(display_name("PL"), "Polski");
+        assert_eq!(display_name("DE"), "Deutsch");
         assert_eq!(display_name("EN-US"), "English");
         assert_eq!(display_name("XX"), "XX");
     }

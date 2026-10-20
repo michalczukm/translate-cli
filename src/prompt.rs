@@ -2,27 +2,41 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
 
-/// Reads from /dev/tty, not stdin, so the prompt still works while text is piped in.
 pub fn read_secret(label: &str) -> Result<String, String> {
+    read_tty(label, false)
+}
+
+pub fn read_line(label: &str) -> Result<String, String> {
+    read_tty(label, true)
+}
+
+/// Reads from /dev/tty, not stdin, so the prompt still works while text is piped in.
+fn read_tty(label: &str, echo: bool) -> Result<String, String> {
     let tty = File::options()
         .read(true)
         .write(true)
         .open("/dev/tty")
-        .map_err(|e| format!("no terminal to read the key from: {e}"))?;
+        .map_err(|e| format!("no terminal to read from: {e}"))?;
 
     let mut out = tty.try_clone().map_err(|e| e.to_string())?;
     write!(out, "{label}").map_err(|e| e.to_string())?;
     out.flush().map_err(|e| e.to_string())?;
 
-    set_echo(&tty, false);
+    if !echo {
+        set_echo(&tty, false);
+    }
 
     let mut line = String::new();
     let read = BufReader::new(tty.try_clone().map_err(|e| e.to_string())?).read_line(&mut line);
 
-    set_echo(&tty, true);
-    let _ = writeln!(out);
+    if !echo {
+        set_echo(&tty, true);
+        let _ = writeln!(out);
+    }
 
-    read.map_err(|e| e.to_string())?;
+    if read.map_err(|e| e.to_string())? == 0 {
+        return Err("no input".to_string());
+    }
     Ok(line.trim().to_string())
 }
 

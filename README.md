@@ -22,29 +22,36 @@ Translations of dzień dobry, co słychać?
 brew install michalczukm/tap/translate-cli
 ```
 
-## Lazy shell functions for the two most common (for me) pairs
+Then run setup once:
 
-```sh
-translate shell-setup   # appends these to ~/.zshrc or ~/.bashrc
+```
+$ translate setup
+Which language do you translate with English? [pl/de]: de
+added tde and ten to ~/.zshrc, run: source ~/.zshrc
+translate uses DeepL to translate, which needs an API key.
+The free tier (500,000 characters/month) is plenty for home use.
+Get one: https://www.deepl.com/pro-api
+Already have an account? Your keys: https://www.deepl.com/your-account/keys
+DeepL API key:
+key saved to ~/.config/translate-cli/.env (0600)
 ```
 
+A first run without a key starts the same setup.
+
+## Shell shortcuts
+
+`ten` translates to English, the other one from English, for the language you picked:
+
 ```sh
-tpl() { translate en:pl "$@"; }
-ten() { translate pl:en "$@"; }
+tpl() { translate en:pl "$@"; }   # or tde() { translate en:de "$@"; }
+ten() { translate pl:en "$@"; }   # or ten() { translate de:en "$@"; }
 ```
+
+Already in your rc file? Setup leaves it alone. `shell-setup` still works as an alias.
 
 ## API key
 
-First run without a key asks for one and stores it:
-
-```
-$ translate pl:en "dzień dobry"
-No DeepL API key found. Get a free API key at https://www.deepl.com/pro-api
-DeepL API key:
-Saved to ~/.config/translate-cli/.env (0600)
-```
-
-Or set it up ahead of time:
+Outside setup:
 
 ```sh
 translate auth set-key            # prompts, input hidden
@@ -64,6 +71,7 @@ Free keys (ending in `:fx`) hit `api-free.deepl.com`, the rest `api.deepl.com`.
 
 ```sh
 translate pl:en "dzień dobry"        # explicit pair
+translate de:en "guten Morgen"       # German works the same
 translate :de "good morning"         # auto-detect the source
 translate de "good morning"          # same thing, shorter
 translate pl:en dzień dobry          # quotes optional

@@ -1,7 +1,7 @@
 use std::io::{IsTerminal, Read, Write};
 
 use translate_cli::cli::{self, Args};
-use translate_cli::{config, prompt};
+use translate_cli::config;
 
 fn main() {
     let cli = match cli::parse_args(std::env::args().skip(1)) {
@@ -20,8 +20,8 @@ fn main() {
     if cli.pair == "auth" {
         finish(cli::auth_command(&cli.text));
     }
-    if cli.pair == "shell-setup" {
-        finish(cli::shell_setup_command());
+    if cli.pair == "setup" || cli.pair == "shell-setup" {
+        finish(cli::setup_command());
     }
 
     let key = match config::load() {
@@ -43,25 +43,16 @@ fn main() {
     finish(cli::run(cli, key, color, &stdin));
 }
 
-/// Only offer the prompt on a terminal; scripts and pipes keep the exit-3 error.
+/// Only offer setup on a terminal; scripts and pipes keep the exit-3 error.
 fn first_run_key() -> Option<String> {
     if !std::io::stderr().is_terminal() {
         return None;
     }
-
-    eprintln!("No DeepL API key found. {}", cli::KEY_HELP);
-    let key = prompt::read_secret("DeepL API key: ").ok()?;
-    if key.is_empty() {
-        return None;
+    eprintln!("No DeepL API key found, running setup.");
+    if let Err((code, msg)) = cli::setup_command() {
+        fail(code, &msg);
     }
-
-    match config::save(&key) {
-        Ok(path) => {
-            eprintln!("Saved to {} (0600)", path.display());
-            Some(key)
-        }
-        Err(msg) => fail(1, &msg),
-    }
+    config::load().ok()
 }
 
 fn finish(result: Result<String, (i32, String)>) -> ! {
