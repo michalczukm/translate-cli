@@ -9,6 +9,7 @@ Usage:
     translate usage                           characters used this month
     translate auth set-key [KEY]              store an API key
     translate auth path                       where the key lives
+    translate shell-setup                     add tpl (en->pl) and ten (pl->en) to your shell rc
 
 TEXT is read from stdin when omitted.
 
@@ -92,6 +93,53 @@ pub fn auth_command(args: &[String]) -> Result<String, (i32, String)> {
         )),
         None => Err((2, "auth needs a subcommand (set-key or path)".to_string())),
     }
+}
+
+const SHELL_FUNCTIONS: &str = "\n# translate-cli shortcuts\n\
+tpl() { translate en:pl \"$@\"; }\n\
+ten() { translate pl:en \"$@\"; }\n";
+
+pub fn shell_setup_command() -> Result<String, (i32, String)> {
+    let shell = std::env::var("SHELL").unwrap_or_default();
+    let rc = match shell.rsplit('/').next() {
+        Some("zsh") => ".zshrc",
+        Some("bash") => ".bashrc",
+        _ => {
+            return Err((
+                1,
+                format!("unsupported shell `{shell}`, add these yourself:\n{SHELL_FUNCTIONS}"),
+            ));
+        }
+    };
+    let home = std::env::var_os("HOME").ok_or((1, "HOME is not set".to_string()))?;
+    let path = std::path::PathBuf::from(home).join(rc);
+    if append_shell_functions(&path).map_err(|e| (1, e.to_string()))? {
+        Ok(format!(
+            "added tpl and ten to {}, run: source {}\n",
+            path.display(),
+            path.display()
+        ))
+    } else {
+        Ok(format!("tpl and ten already in {}\n", path.display()))
+    }
+}
+
+fn append_shell_functions(path: &std::path::Path) -> std::io::Result<bool> {
+    let current = match std::fs::read_to_string(path) {
+        Ok(s) => s,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => return Err(e),
+    };
+    if current.contains("# translate-cli shortcuts") {
+        return Ok(false);
+    }
+    use std::io::Write;
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)?
+        .write_all(SHELL_FUNCTIONS.as_bytes())?;
+    Ok(true)
 }
 
 pub fn parse_pair(pair: &str) -> Result<(Option<String>, String), String> {
@@ -215,6 +263,17 @@ mod tests {
         };
         assert!(!cli.plain);
         assert_eq!(cli.text, vec!["--plain".to_string()]);
+    }
+
+    #[test]
+    fn shell_functions_are_appended_once() {
+        let path = std::env::temp_dir().join(format!("translate-rc-{}", std::process::id()));
+        std::fs::write(&path, "export FOO=1\n").unwrap();
+        assert!(append_shell_functions(&path).unwrap());
+        assert!(!append_shell_functions(&path).unwrap());
+        let rc = std::fs::read_to_string(&path).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        assert_eq!(rc, format!("export FOO=1\n{SHELL_FUNCTIONS}"));
     }
 
     #[test]

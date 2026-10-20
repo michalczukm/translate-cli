@@ -20,6 +20,9 @@ fn main() {
     if cli.pair == "auth" {
         finish(cli::auth_command(&cli.text));
     }
+    if cli.pair == "shell-setup" {
+        finish(cli::shell_setup_command());
+    }
 
     let key = match config::load() {
         Ok(k) => k,

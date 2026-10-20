@@ -18,9 +18,13 @@ Translations of dzień dobry, co słychać?
 
 ## Lazy shell functions for the two most common (for me) pairs
 
-```zsh
-tpl() { translate en:pl "$@" }
-ten() { translate pl:en "$@" }
+```sh
+translate shell-setup   # appends these to ~/.zshrc or ~/.bashrc
+```
+
+```sh
+tpl() { translate en:pl "$@"; }
+ten() { translate pl:en "$@"; }
 ```
 
 ## Install
