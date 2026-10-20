@@ -62,6 +62,20 @@ pub fn lookup_at(base: &str, word: &str) -> Option<Entry> {
     })
 }
 
+pub fn antonyms(word: &str, part_of_speech: &str) -> Vec<String> {
+    antonyms_at(DATAMUSE, word, part_of_speech)
+}
+
+/// Datamuse antonyms span every sense ("cold" -> "heat"), so keep the entry's part of speech.
+pub fn antonyms_at(base: &str, word: &str, pos: &str) -> Vec<String> {
+    fetch(base, "rel_ant", word.trim())
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|w| w.tags.iter().any(|t| part_of_speech(t) == Some(pos)))
+        .map(|w| w.word)
+        .collect()
+}
+
 fn fetch(base: &str, param: &str, word: &str) -> Option<Vec<Word>> {
     ureq::get(format!("{}/words", base.trim_end_matches('/')))
         .query(param, word)

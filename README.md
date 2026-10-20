@@ -102,6 +102,26 @@ nagle
 DeepL has no dictionary data and Datamuse is English-only, so `en:pl` keeps the alternative
 line. `--plain` skips the lookup.
 
+`--synonyms` packs the block into one row of up to six synonyms plus antonyms of the same
+part of speech (the row is skipped when Datamuse has none):
+
+```
+$ translate --synonyms pl:en zimny
+zimny
+
+cold
+
+Synonyms of zimny
+[ Polski -> English ]
+
+adjective
+    synonyms   gelid, bleak, frigid, intense, insensate, cool
+    antonyms   hot
+
+zimny
+    cold
+```
+
 ## The alternative line
 
 One extra call, chosen by target language: DeepL Write (`DE, EN-GB, EN-US, ES, FR, IT, PT-*`),

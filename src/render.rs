@@ -7,6 +7,8 @@ pub struct Output {
     pub translation: String,
     pub alternative: Option<String>,
     pub definitions: Option<Entry>,
+    pub synonyms: bool,
+    pub antonyms: Vec<String>,
     pub source_lang: String,
     pub target_lang: String,
 }
@@ -25,6 +27,20 @@ pub fn full(o: &Output, color: bool) -> String {
     let mut s = format!("{}\n{}\n{}\n\n", o.source_text, did_you_mean, translation);
 
     match &o.definitions {
+        Some(entry) if o.synonyms => {
+            s.push_str(&format!(
+                "Synonyms of {}\n[ {} -> {} ]\n\n{}\n    synonyms   {}\n",
+                o.source_text,
+                display_name(&o.source_lang),
+                display_name(&o.target_lang),
+                entry.part_of_speech,
+                listed(entry.words.iter().skip(1)),
+            ));
+            if !o.antonyms.is_empty() {
+                s.push_str(&format!("    antonyms   {}\n", listed(o.antonyms.iter())));
+            }
+            s.push_str(&format!("\n{}\n    {}\n", o.source_text, o.translation));
+        }
         Some(entry) => {
             s.push_str(&format!(
                 "Definitions of {}\n[ {} -> {} ]\n\n{}\n",
@@ -53,6 +69,14 @@ pub fn full(o: &Output, color: bool) -> String {
     s
 }
 
+fn listed<'a>(words: impl Iterator<Item = &'a String>) -> String {
+    words
+        .take(6)
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 pub fn plain(o: &Output) -> String {
     match &o.alternative {
         Some(alt) => format!("{}\n{}\n", o.translation, alt),
@@ -69,6 +93,8 @@ mod tests {
             source_text: "dzień dobry, co słychać?".into(),
             did_you_mean: None,
             definitions: None,
+            synonyms: false,
+            antonyms: Vec::new(),
             translation: "good morning, how are you?".into(),
             alternative: Some("Good morning! How are you?".into()),
             source_lang: "PL".into(),
@@ -117,11 +143,48 @@ mod tests {
                 part_of_speech: "adverb".into(),
                 words: vec!["suddenly".into(), "abruptly".into()],
             }),
+            synonyms: false,
+            antonyms: Vec::new(),
             source_lang: "PL".into(),
             target_lang: "EN-US".into(),
         };
         let expected = "nagle\n\nsuddenly\n\nDefinitions of nagle\n[ Polski -> English ]\n\nadverb\n    suddenly\n    abruptly\n\nnagle\n    suddenly\n";
         assert_eq!(full(&o, false), expected);
+    }
+
+    #[test]
+    fn synonyms_flag_lists_six_synonyms_and_antonyms_on_one_row_each() {
+        let o = Output {
+            source_text: "szczęśliwy".into(),
+            did_you_mean: None,
+            translation: "happy".into(),
+            alternative: None,
+            definitions: Some(Entry {
+                part_of_speech: "adjective".into(),
+                words: [
+                    "happy",
+                    "halcyon",
+                    "content",
+                    "bright",
+                    "felicitous",
+                    "riant",
+                    "expansive",
+                    "elysian",
+                ]
+                .map(String::from)
+                .to_vec(),
+            }),
+            synonyms: true,
+            antonyms: vec!["sad".into(), "unhappy".into()],
+            source_lang: "PL".into(),
+            target_lang: "EN-US".into(),
+        };
+        let expected = "szczęśliwy\n\nhappy\n\nSynonyms of szczęśliwy\n[ Polski -> English ]\n\nadjective\n    synonyms   halcyon, content, bright, felicitous, riant, expansive\n    antonyms   sad, unhappy\n\nszczęśliwy\n    happy\n";
+        assert_eq!(full(&o, false), expected);
+
+        let mut o = o;
+        o.antonyms.clear();
+        assert!(!full(&o, false).contains("antonyms"));
     }
 
     #[test]

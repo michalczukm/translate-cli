@@ -86,3 +86,23 @@ fn api_failure_yields_no_entry() {
 
     assert_eq!(dictionary::lookup_at(&server.base_url(), "suddenly"), None);
 }
+
+#[test]
+fn antonyms_keep_only_the_entrys_part_of_speech() {
+    let server = MockServer::start();
+    server.mock(|when, then| {
+        when.method(GET)
+            .path("/words")
+            .query_param("rel_ant", "cold");
+        then.status(200).json_body_obj(&serde_json::json!([
+            {"word": "hot", "tags": ["adj", "adv", "v", "n"]},
+            {"word": "heat", "tags": ["n", "v"]},
+            {"word": "hotness", "tags": ["n"]}
+        ]));
+    });
+
+    assert_eq!(
+        dictionary::antonyms_at(&server.base_url(), "cold", "adjective"),
+        vec!["hot".to_string()]
+    );
+}

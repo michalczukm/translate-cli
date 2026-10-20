@@ -15,6 +15,7 @@ TEXT is read from stdin when omitted.
 
 Options:
     --plain          translation and alternative only, no decoration or color
+    --synonyms       single English words: compact synonyms plus antonyms
     -h, --help       show this help
     -V, --version    show the version
 ";
@@ -24,6 +25,7 @@ pub struct Cli {
     pub pair: String,
     pub text: Vec<String>,
     pub plain: bool,
+    pub synonyms: bool,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -35,12 +37,14 @@ pub enum Args {
 /// Everything after the language pair is text, so flags only count before it.
 pub fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
     let mut plain = false;
+    let mut synonyms = false;
     let mut rest = Vec::new();
     let mut args = args.into_iter();
 
     for arg in args.by_ref() {
         match arg.as_str() {
             "--plain" => plain = true,
+            "--synonyms" => synonyms = true,
             "-h" | "--help" => return Ok(Args::Message(USAGE.to_string())),
             "-V" | "--version" => {
                 return Ok(Args::Message(format!(
@@ -61,6 +65,7 @@ pub fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Args, String
         pair,
         text: rest.collect(),
         plain,
+        synonyms,
     }))
 }
 
@@ -208,6 +213,13 @@ pub fn run(cli: Cli, key: String, color: bool, stdin: &str) -> Result<String, (i
         .then(|| dictionary::lookup(&translated.text))
         .flatten();
 
+    let antonyms = match &definitions {
+        Some(entry) if cli.synonyms => {
+            dictionary::antonyms(&translated.text, &entry.part_of_speech)
+        }
+        _ => Vec::new(),
+    };
+
     let alternative = match definitions {
         Some(_) => None,
         None => variants::alternative(
@@ -227,6 +239,8 @@ pub fn run(cli: Cli, key: String, color: bool, stdin: &str) -> Result<String, (i
         translation: translated.text,
         alternative,
         definitions,
+        synonyms: cli.synonyms,
+        antonyms,
     };
 
     Ok(if cli.plain {
@@ -247,11 +261,12 @@ mod tests {
     #[test]
     fn flags_before_the_pair_are_parsed_the_rest_is_text() {
         assert_eq!(
-            args(&["--plain", "pl:en", "dzień", "dobry"]).unwrap(),
+            args(&["--plain", "--synonyms", "pl:en", "dzień", "dobry"]).unwrap(),
             Args::Run(Cli {
                 pair: "pl:en".into(),
                 text: vec!["dzień".into(), "dobry".into()],
                 plain: true,
+                synonyms: true,
             })
         );
     }
