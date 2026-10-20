@@ -21,14 +21,6 @@ unlink:
     @rm -f {{bin_dir}}/translate
     @echo "removed {{bin_dir}}/translate"
 
-# copy the binary into ~/.cargo/bin instead of linking
-install:
-    cargo install --path .
-
-# drop the installed copy
-uninstall:
-    cargo uninstall translate-cli
-
 # unit and integration tests, no live API
 test:
     cargo test
@@ -44,10 +36,6 @@ smoke: build
 
 # what a commit should pass
 check: lint test
-
-# store a DeepL API key
-key: build
-    @{{binary}} auth set-key
 
 # tag the Cargo.toml version, push the tag and point the Homebrew formula at it
 brew-publish: check
