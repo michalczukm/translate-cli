@@ -47,7 +47,8 @@ tpl() { translate en:pl "$@"; }   # or tde() { translate en:de "$@"; }
 ten() { translate pl:en "$@"; }   # or ten() { translate de:en "$@"; }
 ```
 
-Already in your rc file? Setup leaves it alone. `shell-setup` still works as an alias.
+Written to `~/.zshrc`, `~/.bashrc` (`~/.bash_profile` on macOS, which login shells read) or
+`~/.config/fish/conf.d/translate-cli.fish`. Already there? Setup leaves it alone. `shell-setup` still works as an alias.
 
 ## API key
 

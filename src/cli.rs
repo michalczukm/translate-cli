@@ -106,7 +106,14 @@ pub fn auth_command(args: &[String]) -> Result<String, (i32, String)> {
 
 const SHORTCUTS_MARKER: &str = "# translate-cli shortcuts";
 
-fn shell_functions(lang: &str) -> String {
+fn shell_functions(shell: &str, lang: &str) -> String {
+    if shell == "fish" {
+        return format!(
+            "\n{SHORTCUTS_MARKER}\n\
+             function t{lang}; translate en:{lang} $argv; end\n\
+             function ten; translate {lang}:en $argv; end\n"
+        );
+    }
     format!(
         "\n{SHORTCUTS_MARKER}\n\
          t{lang}() {{ translate en:{lang} \"$@\"; }}\n\
@@ -122,10 +129,13 @@ fn parse_language(input: &str) -> Option<&'static str> {
     }
 }
 
-fn rc_file(shell: &str) -> Option<&'static str> {
-    match shell.rsplit('/').next() {
-        Some("zsh") => Some(".zshrc"),
-        Some("bash") => Some(".bashrc"),
+/// macOS terminals open login shells, which read ~/.bash_profile and skip ~/.bashrc.
+fn rc_file(shell: &str, macos: bool) -> Option<&'static str> {
+    match shell {
+        "zsh" => Some(".zshrc"),
+        "bash" if macos => Some(".bash_profile"),
+        "bash" => Some(".bashrc"),
+        "fish" => Some(".config/fish/conf.d/translate-cli.fish"),
         _ => None,
     }
 }
@@ -138,12 +148,13 @@ pub fn setup_command() -> Result<String, (i32, String)> {
 }
 
 fn setup_shortcuts() -> Result<(), (i32, String)> {
-    let shell = std::env::var("SHELL").unwrap_or_default();
-    let Some(rc) = rc_file(&shell) else {
+    let shell_path = std::env::var("SHELL").unwrap_or_default();
+    let shell = shell_path.rsplit('/').next().unwrap_or_default();
+    let Some(rc) = rc_file(shell, cfg!(target_os = "macos")) else {
         let lang = ask_language()?;
         eprintln!(
-            "unsupported shell `{shell}`, add these yourself:\n{}",
-            shell_functions(lang)
+            "unsupported shell `{shell_path}`, add these yourself:\n{}",
+            shell_functions("bash", lang)
         );
         return Ok(());
     };
@@ -154,7 +165,7 @@ fn setup_shortcuts() -> Result<(), (i32, String)> {
         return Ok(());
     }
     let lang = ask_language()?;
-    append_shortcuts(&path, lang).map_err(|e| (1, e.to_string()))?;
+    append_shortcuts(&path, shell, lang).map_err(|e| (1, e.to_string()))?;
     eprintln!(
         "added t{lang} and ten to {p}, run: source {p}",
         p = path.display()
@@ -197,13 +208,16 @@ fn has_shortcuts(path: &std::path::Path) -> std::io::Result<bool> {
     }
 }
 
-fn append_shortcuts(path: &std::path::Path, lang: &str) -> std::io::Result<()> {
+fn append_shortcuts(path: &std::path::Path, shell: &str, lang: &str) -> std::io::Result<()> {
     use std::io::Write;
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
     std::fs::OpenOptions::new()
         .create(true)
         .append(true)
         .open(path)?
-        .write_all(shell_functions(lang).as_bytes())
+        .write_all(shell_functions(shell, lang).as_bytes())
 }
 
 pub fn parse_pair(pair: &str) -> Result<(Option<String>, String), String> {
@@ -344,21 +358,39 @@ mod tests {
         let path = std::env::temp_dir().join(format!("translate-rc-{}", std::process::id()));
         std::fs::write(&path, "export FOO=1\n").unwrap();
         assert!(!has_shortcuts(&path).unwrap());
-        append_shortcuts(&path, "de").unwrap();
+        append_shortcuts(&path, "zsh", "de").unwrap();
         assert!(has_shortcuts(&path).unwrap());
         let rc = std::fs::read_to_string(&path).unwrap();
         std::fs::remove_file(&path).unwrap();
-        assert_eq!(rc, format!("export FOO=1\n{}", shell_functions("de")));
+        assert_eq!(
+            rc,
+            format!("export FOO=1\n{}", shell_functions("zsh", "de"))
+        );
     }
 
     #[test]
     fn shortcuts_pair_the_language_with_english() {
-        let pl = shell_functions("pl");
+        let pl = shell_functions("zsh", "pl");
         assert!(pl.contains("tpl() { translate en:pl \"$@\"; }"));
         assert!(pl.contains("ten() { translate pl:en \"$@\"; }"));
-        let de = shell_functions("de");
+        let de = shell_functions("bash", "de");
         assert!(de.contains("tde() { translate en:de \"$@\"; }"));
         assert!(de.contains("ten() { translate de:en \"$@\"; }"));
+        let fish = shell_functions("fish", "de");
+        assert!(fish.contains("function tde; translate en:de $argv; end"));
+        assert!(fish.contains("function ten; translate de:en $argv; end"));
+    }
+
+    #[test]
+    fn rc_file_per_shell() {
+        assert_eq!(rc_file("zsh", true), Some(".zshrc"));
+        assert_eq!(rc_file("bash", true), Some(".bash_profile"));
+        assert_eq!(rc_file("bash", false), Some(".bashrc"));
+        assert_eq!(
+            rc_file("fish", false),
+            Some(".config/fish/conf.d/translate-cli.fish")
+        );
+        assert_eq!(rc_file("nu", true), None);
     }
 
     #[test]
