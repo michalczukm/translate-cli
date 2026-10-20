@@ -48,3 +48,21 @@ check: lint test
 # store a DeepL API key
 key: build
     @{{binary}} auth set-key
+
+# tag the Cargo.toml version, push the tag and point the Homebrew formula at it
+brew-publish: check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    git diff --quiet HEAD || { echo "working tree not clean" >&2; exit 1; }
+    version=$(cargo pkgid | sed 's/.*[#@]//')
+    git tag "v$version"
+    git push origin "v$version"
+    url="https://github.com/michalczukm/translate-cli/archive/refs/tags/v$version.tar.gz"
+    sha=$(curl -fsSL "$url" | shasum -a 256 | cut -d' ' -f1)
+    tap=$(mktemp -d)
+    trap 'rm -rf "$tap"' EXIT
+    gh repo clone michalczukm/homebrew-tap "$tap" -- -q
+    perl -pi -e "s|^  url .*|  url \"$url\"|; s|^  sha256 .*|  sha256 \"$sha\"|" "$tap/Formula/translate-cli.rb"
+    git -C "$tap" commit -qam "translate-cli $version"
+    git -C "$tap" push -q
+    echo "published translate-cli $version: brew upgrade translate-cli"

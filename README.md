@@ -26,6 +26,12 @@ ten() { translate pl:en "$@" }
 ## Install
 
 ```sh
+brew install michalczukm/tap/translate-cli
+```
+
+From source:
+
+```sh
 just link       # build + symlink into ~/.local/bin, rebuilds go live at once
 just install    # or copy into ~/.cargo/bin via cargo install
 ```
