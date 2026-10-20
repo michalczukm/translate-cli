@@ -16,6 +16,12 @@ Translations of dzień dobry, co słychać?
     Good morning! How are you?
 ```
 
+## Install
+
+```sh
+brew install michalczukm/tap/translate-cli
+```
+
 ## Lazy shell functions for the two most common (for me) pairs
 
 ```sh
@@ -26,21 +32,6 @@ translate shell-setup   # appends these to ~/.zshrc or ~/.bashrc
 tpl() { translate en:pl "$@"; }
 ten() { translate pl:en "$@"; }
 ```
-
-## Install
-
-```sh
-brew install michalczukm/tap/translate-cli
-```
-
-From source:
-
-```sh
-just link       # build + symlink into ~/.local/bin, rebuilds go live at once
-just install    # or copy into ~/.cargo/bin via cargo install
-```
-
-`just` on its own lists every recipe. Without `just`: `cargo install --path .`.
 
 ## API key
 
@@ -138,3 +129,12 @@ just smoke      # hits the real API with the key from .env
 ```
 
 CI runs the same three commands on every push.
+
+### Install from source
+
+```sh
+just link       # build + symlink into ~/.local/bin, rebuilds go live at once
+just install    # or copy into ~/.cargo/bin via cargo install
+```
+
+`just` on its own lists every recipe. Without `just`: `cargo install --path .`.
