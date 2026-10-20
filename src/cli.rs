@@ -223,7 +223,7 @@ mod tests {
         let Ok(Args::Message(v)) = args(&["-V"]) else {
             panic!("expected a message")
         };
-        assert!(v.starts_with("translate 0."));
+        assert_eq!(v, format!("translate {}\n", env!("CARGO_PKG_VERSION")));
     }
 
     #[test]
