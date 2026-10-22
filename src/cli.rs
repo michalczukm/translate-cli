@@ -90,7 +90,7 @@ pub fn auth_command(args: &[String]) -> Result<String, (i32, String)> {
                 }
             };
             let path = config::save(&key).map_err(|m| (1, m))?;
-            Ok(format!("key saved to {} (0600)\n", path.display()))
+            Ok(format!("key saved to {} (0600)\n", tilde(&path)))
         }
         Some("path") => {
             let path = config::config_path().ok_or((1, "HOME is not set".to_string()))?;
@@ -161,14 +161,14 @@ fn setup_shortcuts() -> Result<(), (i32, String)> {
     let home = std::env::var_os("HOME").ok_or((1, "HOME is not set".to_string()))?;
     let path = std::path::PathBuf::from(home).join(rc);
     if has_shortcuts(&path).map_err(|e| (1, e.to_string()))? {
-        eprintln!("shortcuts already in {}", path.display());
+        eprintln!("shortcuts already in {}", tilde(&path));
         return Ok(());
     }
     let lang = ask_language()?;
     append_shortcuts(&path, shell, lang).map_err(|e| (1, e.to_string()))?;
     eprintln!(
         "added t{lang} and ten to {p}, run: source {p}",
-        p = path.display()
+        p = tilde(&path)
     );
     Ok(())
 }
@@ -196,8 +196,16 @@ fn setup_key() -> Result<(), (i32, String)> {
         return Ok(());
     }
     let path = config::save(&key).map_err(|m| (1, m))?;
-    eprintln!("key saved to {} (0600)", path.display());
+    eprintln!("key saved to {} (0600)", tilde(&path));
     Ok(())
+}
+
+fn tilde(path: &std::path::Path) -> String {
+    let home = std::env::var_os("HOME").unwrap_or_default();
+    match path.strip_prefix(&home) {
+        Ok(rest) if !home.is_empty() => format!("~/{}", rest.display()),
+        _ => path.display().to_string(),
+    }
 }
 
 fn has_shortcuts(path: &std::path::Path) -> std::io::Result<bool> {
@@ -391,6 +399,13 @@ mod tests {
             Some(".config/fish/conf.d/translate-cli.fish")
         );
         assert_eq!(rc_file("nu", true), None);
+    }
+
+    #[test]
+    fn paths_under_home_print_with_a_tilde() {
+        let home = std::path::PathBuf::from(std::env::var_os("HOME").unwrap());
+        assert_eq!(tilde(&home.join(".zshrc")), "~/.zshrc");
+        assert_eq!(tilde(std::path::Path::new("/etc/zshrc")), "/etc/zshrc");
     }
 
     #[test]
