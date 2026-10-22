@@ -48,7 +48,9 @@ ten() { translate pl:en "$@"; }   # or ten() { translate de:en "$@"; }
 ```
 
 Written to `~/.zshrc`, `~/.bashrc` (`~/.bash_profile` on macOS, which login shells read) or
-`~/.config/fish/conf.d/translate-cli.fish`. Already there? Setup leaves it alone. `shell-setup` still works as an alias.
+`~/.config/fish/conf.d/translate-cli.fish`. Already there? Setup leaves it alone.
+On zsh the shortcuts are wrapped in `noglob`, so `ten wie geht es dir?` works without quotes
+(apostrophes like `I'll` still need them). `shell-setup` still works as an alias.
 
 ## API key
 

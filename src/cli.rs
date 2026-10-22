@@ -114,6 +114,17 @@ fn shell_functions(shell: &str, lang: &str) -> String {
              function ten; translate {lang}:en $argv; end\n"
         );
     }
+    // noglob keeps `ten wie geht es dir?` from failing on zsh's nomatch; the
+    // `function` keyword stops the alias expanding when the rc is re-sourced.
+    if shell == "zsh" {
+        return format!(
+            "\n{SHORTCUTS_MARKER}\n\
+             function t{lang} {{ translate en:{lang} \"$@\"; }}\n\
+             function ten {{ translate {lang}:en \"$@\"; }}\n\
+             alias t{lang}='noglob t{lang}'\n\
+             alias ten='noglob ten'\n"
+        );
+    }
     format!(
         "\n{SHORTCUTS_MARKER}\n\
          t{lang}() {{ translate en:{lang} \"$@\"; }}\n\
@@ -379,8 +390,8 @@ mod tests {
     #[test]
     fn shortcuts_pair_the_language_with_english() {
         let pl = shell_functions("zsh", "pl");
-        assert!(pl.contains("tpl() { translate en:pl \"$@\"; }"));
-        assert!(pl.contains("ten() { translate pl:en \"$@\"; }"));
+        assert!(pl.contains("function tpl { translate en:pl \"$@\"; }"));
+        assert!(pl.contains("alias ten='noglob ten'"));
         let de = shell_functions("bash", "de");
         assert!(de.contains("tde() { translate en:de \"$@\"; }"));
         assert!(de.contains("ten() { translate de:en \"$@\"; }"));
